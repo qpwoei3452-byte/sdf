@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>레시피 추천 시스템 — 기술 정리</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --blue:#1F4E79;--blue-light:#E6F1FB;--blue-mid:#2E75B6;
+    --green:#375623;--green-light:#EAF3DE;--green-mid:#639922;
+    --red:#A32D2D;--red-light:#FCEBEB;
+    --warn:#854F0B;--warn-light:#FAEEDA;
+    --gray:#444;--gray-light:#F8F9FA;--border:#DEE2E6;
+    --text:#212529;--sub:#6C757D;
+  }
+  body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;background:#F4F6FA;color:var(--text);font-size:15px;line-height:1.7;}
+  a{color:var(--blue-mid);text-decoration:none;}
+
+  /* ── 상단 헤더 */
+  .hero{background:var(--blue);color:#fff;padding:48px 40px 40px;position:relative;overflow:hidden;}
+  .hero::after{content:'';position:absolute;right:-80px;top:-80px;width:320px;height:320px;border-radius:50%;background:rgba(255,255,255,.05);}
+  .hero-tag{font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.7;margin-bottom:10px;}
+  .hero h1{font-size:28px;font-weight:700;margin-bottom:8px;line-height:1.3;}
+  .hero p{opacity:.8;font-size:14px;max-width:560px;}
+  .hero-meta{margin-top:20px;display:flex;gap:20px;flex-wrap:wrap;}
+  .hero-badge{background:rgba(255,255,255,.15);border-radius:20px;padding:4px 14px;font-size:12px;}
+
+  /* ── 탭 네비 */
+  .nav{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;display:flex;gap:0;overflow-x:auto;}
+  .nav-btn{padding:14px 24px;font-size:14px;font-weight:500;cursor:pointer;border:none;background:none;color:var(--sub);white-space:nowrap;border-bottom:3px solid transparent;transition:.2s;}
+  .nav-btn:hover{color:var(--text);background:var(--gray-light);}
+  .nav-btn.active{color:var(--blue);border-bottom-color:var(--blue);}
+
+  /* ── 컨텐츠 */
+  .content{display:none;max-width:860px;margin:0 auto;padding:40px 24px 80px;}
+  .content.active{display:block;}
+
+  /* ── 섹션 */
+  .sec{margin-bottom:40px;}
+  .sec-title{font-size:18px;font-weight:700;color:var(--blue);margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid var(--blue-light);}
+  .sub-title{font-size:15px;font-weight:700;color:var(--text);margin:24px 0 10px;}
+
+  /* ── 카드 */
+  .card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:12px;}
+  .card-head{font-size:14px;font-weight:700;margin-bottom:8px;color:var(--text);}
+  .card-body{font-size:13.5px;color:var(--sub);line-height:1.8;}
+
+  /* ── 스텝 */
+  .steps{display:flex;flex-direction:column;gap:10px;}
+  .step{display:flex;gap:14px;align-items:flex-start;padding:14px 16px;border:1px solid var(--border);border-radius:8px;background:#fff;}
+  .step-num{width:30px;height:30px;border-radius:50%;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .num-blue{background:var(--blue-light);color:var(--blue);}
+  .num-green{background:var(--green-light);color:var(--green);}
+  .num-warn{background:var(--warn-light);color:var(--warn);}
+  .num-red{background:var(--red-light);color:var(--red);}
+  .step-content{flex:1;}
+  .step-title{font-size:13.5px;font-weight:700;margin-bottom:4px;}
+  .step-desc{font-size:13px;color:var(--sub);line-height:1.7;}
+
+  /* ── 비교 박스 */
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0;}
+  .compare-box{border-radius:8px;padding:14px 16px;font-size:13px;line-height:1.7;}
+  .box-red{background:var(--red-light);border:1px solid #F09595;color:var(--red);}
+  .box-green{background:var(--green-light);border:1px solid #C0DD97;color:var(--green);}
+  .box-title{font-size:11px;font-weight:700;opacity:.8;margin-bottom:6px;}
+
+  /* ── 테이블 */
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0;}
+  th{background:var(--blue);color:#fff;padding:9px 12px;text-align:left;font-weight:600;}
+  td{padding:9px 12px;border-bottom:1px solid var(--border);}
+  tr:nth-child(even) td{background:var(--gray-light);}
+
+  /* ── 공식 */
+  .formula{background:var(--blue-light);border:1px solid #B5D4F4;border-radius:8px;padding:14px 18px;font-family:monospace;font-size:14px;color:var(--blue);text-align:center;margin:12px 0;font-weight:700;}
+
+  /* ── 경고 */
+  .warn-box{background:var(--warn-light);border:1px solid #FAC775;border-radius:8px;padding:14px 16px;font-size:13px;color:var(--warn);line-height:1.7;}
+  .info-box{background:var(--blue-light);border:1px solid #B5D4F4;border-radius:8px;padding:14px 16px;font-size:13px;color:var(--blue);line-height:1.7;}
+  .success-box{background:var(--green-light);border:1px solid #C0DD97;border-radius:8px;padding:14px 16px;font-size:13px;color:var(--green);line-height:1.7;}
+
+  /* ── 통계 카드 */
+  .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:12px 0;}
+  .stat{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;}
+  .stat-val{font-size:26px;font-weight:700;color:var(--blue);}
+  .stat-label{font-size:12px;color:var(--sub);margin-top:4px;}
+
+  /* ── 칩 */
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .chip{font-size:12px;padding:4px 10px;border-radius:20px;background:var(--gray-light);border:1px solid var(--border);}
+  .chip.danger{background:var(--red-light);border-color:#F09595;color:var(--red);font-weight:600;}
+
+  /* ── 코드 */
+  code{font-family:monospace;background:var(--gray-light);padding:2px 6px;border-radius:4px;font-size:12.5px;color:#c7254e;}
+
+  /* ── 흐름 */
+  .flow{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin:10px 0;}
+  .flow-box{background:var(--gray-light);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12.5px;white-space:nowrap;}
+  .flow-arr{color:var(--sub);font-size:16px;padding:0 2px;}
+
+  /* ── 피드백 박스 */
+  .feedback{border-left:4px solid var(--red);padding:12px 16px;margin-bottom:6px;background:var(--red-light);border-radius:0 8px 8px 0;}
+  .feedback-label{font-size:11px;font-weight:700;color:var(--red);margin-bottom:4px;}
+  .feedback-text{font-size:13px;color:var(--red);line-height:1.6;font-style:italic;}
+  .response{border-left:4px solid var(--green-mid);padding:12px 16px;margin-bottom:16px;background:var(--green-light);border-radius:0 8px 8px 0;}
+  .response-label{font-size:11px;font-weight:700;color:var(--green);margin-bottom:4px;}
+  .response-text{font-size:13px;color:var(--green);line-height:1.6;}
+
+  @media(max-width:600px){
+    .hero{padding:32px 20px 28px;}
+    .hero h1{font-size:22px;}
+    .content{padding:24px 16px 60px;}
+    .compare{grid-template-columns:1fr;}
+    .stat-row{grid-template-columns:repeat(2,1fr);}
+  }
+</style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<div class="hero">
+  <div class="hero-tag">홍익대학교 산업데이터공학과 · 졸업프로젝트</div>
+  <h1>레시피 추천 시스템<br>기술 정리 문서</h1>
+  <p>팀원들이 발표 전 내용을 빠르게 파악할 수 있도록 핵심 로직과 개선 과정을 정리했어요.</p>
+  <div class="hero-meta">
+    <span class="hero-badge">점수 계산 구조</span>
+    <span class="hero-badge">가격 파이프라인</span>
+    <span class="hero-badge">알레르기 필터링</span>
+    <span class="hero-badge">1,146개 레시피</span>
+  </div>
+</div>
+
+<!-- 탭 네비 -->
+<div class="nav" id="nav">
+  <button class="nav-btn active" onclick="tab('score',this)">① 점수 계산</button>
+  <button class="nav-btn" onclick="tab('price',this)">② 가격 파이프라인</button>
+  <button class="nav-btn" onclick="tab('allergy',this)">③ 알레르기 필터링</button>
+  <button class="nav-btn" onclick="tab('feedback',this)">④ 교수 피드백 반영</button>
+</div>
+
+<!-- ══════════ 탭 1: 점수 계산 ══════════ -->
+<div id="tab-score" class="content active">
+
+  <div class="sec">
+    <div class="sec-title">점수 계산 — 어떻게 추천 순위가 결정되는가</div>
+    <div class="card">
+      <div class="card-head">전체 흐름 요약</div>
+      <div class="flow">
+        <div class="flow-box">가중치 결정</div><div class="flow-arr">→</div>
+        <div class="flow-box">5개 기준 정규화</div><div class="flow-arr">→</div>
+        <div class="flow-box">가중 합산</div><div class="flow-arr">→</div>
+        <div class="flow-box">이력 미세 조정</div><div class="flow-arr">→</div>
+        <div class="flow-box">MMR 재정렬</div><div class="flow-arr">→</div>
+        <div class="flow-box">추천 순위 출력</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Step 1. 가중치 결정 (resolve_weights)</div>
+    <div class="card-body" style="margin-bottom:12px;font-size:13.5px;color:var(--sub);">
+      가중치는 아래 우선순위 순서로 결정돼요. 위에 있을수록 먼저 적용됩니다.
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num num-blue">1</div>
+        <div class="step-content">
+          <div class="step-title">프로필 저장값 (user_weights)</div>
+          <div class="step-desc">회원가입 때 슬라이더로 설정하고 저장한 값. <code>profile_service.json</code>에 저장되어 있으면 항상 이게 먼저 적용돼요.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num num-blue">2</div>
+        <div class="step-content">
+          <div class="step-title">즉석 슬라이더 (w_price / w_protein / ...)</div>
+          <div class="step-desc">검색 화면에서 직접 조정한 값. 5개 합이 자동으로 1.0이 되도록 정규화됩니다.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num num-blue">3</div>
+        <div class="step-content">
+          <div class="step-title">모드 프리셋 (mode)</div>
+          <div class="step-desc">슬라이더 설정이 없을 때 사용. 가성비 / 고단백 / 저칼로리 / 저염 / 기본 중 선택.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <table>
+        <tr><th>모드</th><th>가격</th><th>단백질</th><th>칼로리</th><th>나트륨</th><th>시간</th></tr>
+        <tr><td>가성비</td><td>40%</td><td>18%</td><td>10%</td><td>7%</td><td>25%</td></tr>
+        <tr><td>고단백</td><td>18%</td><td>42%</td><td>15%</td><td>10%</td><td>15%</td></tr>
+        <tr><td>저칼로리</td><td>15%</td><td>18%</td><td>40%</td><td>15%</td><td>12%</td></tr>
+        <tr><td>저염</td><td>15%</td><td>20%</td><td>15%</td><td>40%</td><td>10%</td></tr>
+        <tr><td>기본</td><td>25%</td><td>22%</td><td>18%</td><td>15%</td><td>20%</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Step 2. 정규화 (normalize_scores)</div>
+    <div class="card">
+      <div class="card-body">
+        단위가 제각각인 5개 기준을 <strong>0~1 사이로 통일</strong>해요. 1,146개 레시피 전체에서 최댓값을 기준으로 나눕니다.
+      </div>
+    </div>
+    <table>
+      <tr><th>기준</th><th>정규화 공식</th><th>해석</th><th>예시</th></tr>
+      <tr><td>가격</td><td>1 − (가격 / 최대가격)</td><td>싸면 높은 점수</td><td>200원 → 약 0.95점</td></tr>
+      <tr><td>단백질</td><td>단백질 / 최대단백질</td><td>많을수록 높은 점수</td><td>30g → 약 0.7점</td></tr>
+      <tr><td>칼로리</td><td>1 − (칼로리 / 최대칼로리)</td><td>낮을수록 높은 점수</td><td>150kcal → 약 0.8점</td></tr>
+      <tr><td>나트륨</td><td>1 − (나트륨 / 최대나트륨)</td><td>낮을수록 높은 점수</td><td>200mg → 약 0.85점</td></tr>
+      <tr><td>조리시간</td><td>1 − (시간 / 최대시간)</td><td>빠를수록 높은 점수</td><td>15분 → 약 0.75점</td></tr>
+    </table>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Step 3. 기본 점수 산출 (calc_score)</div>
+    <div class="formula">BaseScore = w_price · s_price + w_protein · s_protein + w_calorie · s_calorie + w_sodium · s_sodium + w_time · s_time</div>
+    <div class="card">
+      <div class="card-head">구체 예시 — 가격 슬라이더를 80%로 설정했을 때</div>
+      <div class="card-body">
+        재료비 200원 레시피 → s_price ≈ 0.95 → 0.80 × 0.95 = <strong>0.76점 (가격 기여분만)</strong><br>
+        재료비 8,000원 레시피 → s_price ≈ 0.11 → 0.80 × 0.11 = <strong>0.09점</strong><br>
+        → 가격 슬라이더를 높이면 저렴한 레시피가 훨씬 유리해짐
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Step 4. 이력 기반 미세 조정 (blend_with_log)</div>
+    <div class="formula">최종 가중치 = 0.75 × 기본 가중치 + 0.25 × 이력 취향 신호</div>
+    <div class="card">
+      <div class="card-body">
+        먹은 음식 이력이 <strong>3개 이상</strong> 쌓이면 작동해요.<br>
+        사용자가 계속 저렴한 레시피를 골랐다면 → 가격 가중치가 소폭 자동 올라감<br>
+        α=0.25로 설정해서 기본 설정이 너무 많이 바뀌지 않도록 제한.
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Step 5. MMR 재정렬 — 다양성 확보</div>
+    <div class="formula">MMR(d_i) = 0.7 × Relevance(d_i) − 0.3 × max_sim(d_i, 선택된 레시피)</div>
+    <div class="compare">
+      <div class="compare-box box-red">
+        <div class="box-title">❌ 기존 방식 (교수님 지적)</div>
+        유사도 0.8이면<br>
+        점수 × (1 − 0.8×0.8) = 점수 × 0.36<br>
+        → <strong>점수 64% 날아감</strong><br>
+        → 관련 레시피가 순위 밖으로 밀림
+      </div>
+      <div class="compare-box box-green">
+        <div class="box-title">✅ 현재 방식 (MMR)</div>
+        점수는 그대로 유지<br>
+        이미 뽑힌 것과 비슷하면<br>
+        → <strong>순서만 뒤로 미룸</strong><br>
+        → 다양한 레시피 노출
+      </div>
+    </div>
+    <div class="info-box">
+      <strong>λ=0.7 의미:</strong> 관련성(70%)을 우선시하면서 다양성(30%)을 보조. 비율 조정 가능.
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════ 탭 2: 가격 파이프라인 ══════════ -->
+<div id="tab-price" class="content">
+
+  <div class="sec">
+    <div class="sec-title">가격 파이프라인 — 어떻게 재료비를 계산하는가</div>
+    <div class="card">
+      <div class="card-head">근본 문제: lprice를 단가로 착각</div>
+      <div class="card-body">네이버 쇼핑 API의 <code>lprice</code>는 상품 한 개의 <strong>총 판매가</strong>예요. 이걸 100g 단가처럼 쓰면 완전히 틀린 값이 나옵니다.</div>
+      <div class="compare" style="margin-top:12px;">
+        <div class="compare-box box-red">
+          <div class="box-title">❌ 잘못된 방식 (초기 코드)</div>
+          "양파 3kg 9,900원" 검색<br>
+          lprice = 9,900원 그대로 단가 사용<br>
+          → 양파 30g = <strong>9,900원 × 0.3 = 2,970원</strong><br>
+          → 말이 안 되는 금액
+        </div>
+        <div class="compare-box box-green">
+          <div class="box-title">✅ 수정된 방식</div>
+          상품명에서 "3kg" 추출<br>
+          9,900 ÷ 3,000g × 100 = <strong>330원/100g</strong><br>
+          → 양파 30g = 99원<br>
+          → 현실적인 금액
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">3단계 가격 파이프라인</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num num-blue">1</div>
+        <div class="step-content">
+          <div class="step-title">KAMIS API — 농산물유통공사 공식 시세</div>
+          <div class="step-desc">배추, 양파, 감자 등 신선 농산물과 수산물. <strong>정부 공식 일별 도매가</strong>라 가장 신뢰도 높음.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num num-blue">2</div>
+        <div class="step-content">
+          <div class="step-title">네이버 쇼핑 API — 가공품·조미료 실거래가</div>
+          <div class="step-desc">된장, 고춧가루, 참기름 등 KAMIS에 없는 재료. 여러 상품의 <strong>중앙값</strong>을 사용해 이상값 영향을 줄임.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num num-green">3</div>
+        <div class="step-content">
+          <div class="step-title">STANDARD_AVERAGE_DB — 직접 조사한 기준가</div>
+          <div class="step-desc">1, 2단계에서 못 찾은 재료의 최후 수단. 300여 품목을 직접 조사해서 DB에 넣어둔 값.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">이상값 문제 — PRICE_CAP으로 해결</div>
+    <div class="card">
+      <div class="card-body">
+        네이버에서 "토마토" 검색 시 유기농 소포장, 선물세트 같은 고가 상품도 함께 나와요.
+        이것들이 단가를 크게 왜곡시켜서 <strong>재료별 상한선(PRICE_CAP)</strong>을 설정했어요.
+        상한을 초과하면 해당 값을 버리고 STANDARD_AVERAGE_DB 값을 사용합니다.
+      </div>
+    </div>
+    <div style="margin-top:12px;">
+    <table>
+      <tr><th>재료</th><th>상한선 (100g당)</th><th>이유</th></tr>
+      <tr><td>양파</td><td>800원</td><td>일반 마트 기준</td></tr>
+      <tr><td>토마토</td><td>2,000원</td><td>방울토마토와 구분</td></tr>
+      <tr><td>삼겹살</td><td>3,500원</td><td>국내산 삼겹살 상한</td></tr>
+      <tr><td>즉석밥</td><td>2,000원</td><td>햇반 210g = 2,800원 기준</td></tr>
+      <tr><td>게</td><td>3,000원</td><td>꽃게 평균 시세</td></tr>
+      <tr><td>바나나</td><td>1,000원</td><td>수입 바나나 기준</td></tr>
+    </table>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">이상값 개선 7단계 과정</div>
+    <table>
+      <tr><th>단계</th><th>최댓값</th><th>평균값</th><th>중앙값</th><th>주요 변경</th></tr>
+      <tr><td>1차 (전체 처리)</td><td>126,611원</td><td>6,848원</td><td>4,049원</td><td>1,146개 전체 처리 직후 — 이상값 폭발</td></tr>
+      <tr><td>2차</td><td>70,975원</td><td>6,472원</td><td>3,713원</td><td>주요 채소·과일 PRICE_CAP 추가</td></tr>
+      <tr><td>3차</td><td>50,926원</td><td>5,635원</td><td>3,460원</td><td>사골육수·단호박·통삼겹 추가</td></tr>
+      <tr><td>4차</td><td>35,652원</td><td>5,094원</td><td>3,143원</td><td>맥주·팽이버섯·대하 등 추가</td></tr>
+      <tr><td>5차</td><td>28,414원</td><td>4,629원</td><td>3,060원</td><td>족발·바나나·박력분 등 추가</td></tr>
+      <tr><td>6차</td><td>27,356원</td><td>4,705원</td><td>3,132원</td><td>발효원종·묵은지 DB 추가</td></tr>
+      <tr><td><strong>최종</strong></td><td><strong>27,152원</strong></td><td><strong>4,297원</strong></td><td><strong>2,970원</strong></td><td>캐시 키 정규화 버그 근본 수정</td></tr>
+    </table>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">캐시 키 정규화 버그 — 핵심 버그</div>
+    <div class="card">
+      <div class="card-body">가격 계산 결과를 JSON에 저장할 때 <strong>원본 재료명</strong>을 키로 쓰고 있었어요. 정규화 후에도 예전 잘못된 값이 계속 반환됐습니다.</div>
+      <div class="compare" style="margin-top:12px;">
+        <div class="compare-box box-red">
+          <div class="box-title">❌ 버그 상황</div>
+          "청국장리조뜨 밥" 입력<br>
+          → 정규화 → "즉석밥"으로 변환해야 함<br>
+          캐시 키: "청국장리조뜨_150.0"<br>
+          → 잘못된 값 <strong>18,608원</strong>이 계속 반환
+        </div>
+        <div class="compare-box box-green">
+          <div class="box-title">✅ 수정 후</div>
+          캐시 키를 정규화된 키워드 기준으로 저장<br>
+          → "즉석밥_150.0"으로 올바르게 저장<br>
+          → 햇반 시중가 기준 <strong>약 2,000원</strong>으로 정상 반영
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">최종 재료비 분포</div>
+    <div class="stat-row">
+      <div class="stat"><div class="stat-val">69원</div><div class="stat-label">최솟값</div></div>
+      <div class="stat"><div class="stat-val">2,970원</div><div class="stat-label">중앙값</div></div>
+      <div class="stat"><div class="stat-val">4,297원</div><div class="stat-label">평균값</div></div>
+    </div>
+    <table>
+      <tr><th>구간</th><th>레시피 수</th><th>비율</th><th>등급</th></tr>
+      <tr><td>~1,000원</td><td>200개</td><td>17.5%</td><td>낮음</td></tr>
+      <tr><td>1,000~3,000원</td><td>376개</td><td>32.9%</td><td>낮음</td></tr>
+      <tr><td>3,000~5,000원</td><td>211개</td><td>18.5%</td><td>보통</td></tr>
+      <tr><td>5,000~10,000원</td><td>235개</td><td>20.6%</td><td>보통</td></tr>
+      <tr><td>10,000원 이상</td><td>124개</td><td>10.8%</td><td>높음</td></tr>
+    </table>
+    <div class="warn-box" style="margin-top:12px;">
+      <strong>전체적으로 낮게 나오는 이유:</strong> 식약처 레시피가 저염·건강식 기준으로 설계되어 재료량이 일반 가정식보다 적게 기재돼 있어요. 모든 레시피가 같은 기준으로 계산되므로 <strong>상대적 비교는 유효</strong>합니다.
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════ 탭 3: 알레르기 필터링 ══════════ -->
+<div id="tab-allergy" class="content">
+
+  <div class="sec">
+    <div class="sec-title">왜 단순 문자열 매칭이 안 되는가</div>
+    <div class="compare">
+      <div class="compare-box box-red">
+        <div class="box-title">❌ 단순 검색의 위험성</div>
+        "게 알레르기" 선택<br>
+        → "게" 글자만 검색해서 필터링<br>
+        → "킹크랩", "꽃게", "대게", "게맛살"<br>
+        → 포함된 레시피 <strong>그냥 통과됨</strong>
+      </div>
+      <div class="compare-box box-green">
+        <div class="box-title">✅ 우리 방식 (allergy_map)</div>
+        사전에 재료 전체를 분류해둠<br>
+        꽃게 → [게], 킹크랩 → [게], 게맛살 → [게]<br>
+        → "게" 선택 시 <strong>관련 재료 전부 잡음</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">기준: 식약처 공식 알레르기 22종</div>
+    <div class="info-box">임의로 정한 게 아니라 <strong>식품의약품안전처가 법으로 지정한 공식 기준</strong>이에요. 발표 때 설득력 있게 설명할 수 있어요.</div>
+    <div class="chips" style="margin-top:12px;">
+      <span class="chip danger">알류(달걀)</span><span class="chip danger">우유</span><span class="chip danger">메밀</span>
+      <span class="chip danger">땅콩</span><span class="chip danger">대두(콩)</span><span class="chip danger">밀</span>
+      <span class="chip danger">고등어</span><span class="chip danger">게</span><span class="chip danger">새우</span>
+      <span class="chip danger">돼지고기</span><span class="chip danger">복숭아</span><span class="chip danger">토마토</span>
+      <span class="chip">아황산류</span><span class="chip">호두</span><span class="chip">닭고기</span>
+      <span class="chip">쇠고기</span><span class="chip">오징어</span><span class="chip">조개류</span>
+      <span class="chip">잣</span><span class="chip">아몬드</span><span class="chip">캐슈넛</span><span class="chip">피스타치오</span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">재료 분류 방법 — 2단계</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num num-blue">1</div>
+        <div class="step-content">
+          <div class="step-title">규칙 기반 사전 (RULE_MAP) — 85종 직접 정의</div>
+          <div class="step-desc">
+            명확한 재료들은 코드에 직접 넣어뒀어요. Gemini 안 쓰니까 <strong>100% 정확</strong>합니다.<br>
+            예: <code>달걀 → [알류]</code>, <code>킹크랩 → [게]</code>, <code>두부 → [대두]</code>, <code>소시지 → [돼지고기]</code>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num num-green">2</div>
+        <div class="step-content">
+          <div class="step-title">Gemini AI 배치 분류 — 나머지 1,035종</div>
+          <div class="step-desc">
+            50개씩 묶어서 Gemini에게 식약처 22종 기준으로 분류 요청.<br>
+            예: <code>노루궁뎅이버섯 → []</code>, <code>맛살 → [게]</code>, <code>어묵 → [밀, 대두]</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">배치 처리 중 겪은 문제 3가지</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num num-red">!</div>
+        <div class="step-content">
+          <div class="step-title">1차 — Gemini 1.5 Flash 모델 → 전부 404 오류</div>
+          <div class="step-desc">2026년 6월 1일자로 Gemini 1.5 Flash 공식 종료. 21개 배치 전부 실패. 규칙 기반 66개만 분류됨.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num num-warn">!</div>
+        <div class="step-content">
+          <div class="step-title">2차 — 모델 교체 후 → Rate Limit(429) 오류</div>
+          <div class="step-desc">gemini-2.5-flash-lite로 교체 후 재실행. 12~14번 배치에서 API 호출 초과. 해당 배치 재료가 빈값으로 저장됨.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num num-green">✓</div>
+        <div class="step-content">
+          <div class="step-title">3차 — 빈값 재처리 로직 추가 → 338개 분류 완료</div>
+          <div class="step-desc"><code>allergy_map[n] == []</code> 조건으로 빈값도 재처리하도록 수정. 배치 간 2초 대기 추가로 Rate Limit 방지.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">최종 분류 결과</div>
+    <div class="stat-row">
+      <div class="stat"><div class="stat-val">1,120</div><div class="stat-label">처리된 전체 재료</div></div>
+      <div class="stat"><div class="stat-val">338</div><div class="stat-label">알레르기 있는 재료</div></div>
+      <div class="stat"><div class="stat-val">782</div><div class="stat-label">알레르기 없는 재료</div></div>
+    </div>
+    <table style="margin-top:12px;">
+      <tr><th>알레르기</th><th>분류된 재료 수</th><th>대표 재료</th></tr>
+      <tr><td>밀</td><td>80개</td><td>밀가루, 소면, 박력분, 당면, 빵가루</td></tr>
+      <tr><td>대두</td><td>57개</td><td>두부, 된장, 간장, 청국장, 콩나물</td></tr>
+      <tr><td>우유</td><td>44개</td><td>버터, 치즈, 생크림, 요거트</td></tr>
+      <tr><td>조개류</td><td>36개</td><td>굴, 전복, 홍합, 바지락, 꼬막</td></tr>
+      <tr><td>돼지고기</td><td>19개</td><td>삼겹살, 족발, 햄, 베이컨, 스팸</td></tr>
+      <tr><td>새우</td><td>14개</td><td>새우, 대하, 칵테일새우, 왕새우</td></tr>
+      <tr><td>게</td><td>8개</td><td>게, 꽃게, 대게, 킹크랩, 게맛살</td></tr>
+    </table>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">실제 동작 예시</div>
+    <div class="info-box" style="margin-bottom:12px;">사용자가 <strong>"게"</strong>와 <strong>"새우"</strong> 체크박스 선택 후 검색할 때</div>
+    <table>
+      <tr><th>레시피</th><th>포함 재료</th><th>결과</th></tr>
+      <tr><td>된장찌개</td><td>두부, 된장, 애호박</td><td style="color:var(--green-mid);font-weight:600;">✅ 추천됨</td></tr>
+      <tr><td>새우볶음밥</td><td>새우, 쌀, 대파</td><td style="color:var(--red);font-weight:600;">❌ 제외 (새우)</td></tr>
+      <tr><td>꽃게탕</td><td>꽃게, 무, 대파</td><td style="color:var(--red);font-weight:600;">❌ 제외 (게 계열)</td></tr>
+      <tr><td>게살리소또</td><td>게살, 쌀, 버터</td><td style="color:var(--red);font-weight:600;">❌ 제외 (게 계열)</td></tr>
+      <tr><td>고등어조림</td><td>고등어, 무, 간장</td><td style="color:var(--green-mid);font-weight:600;">✅ 추천됨 (게/새우 아님)</td></tr>
+    </table>
+    <div class="warn-box" style="margin-top:12px;">
+      <strong>⚠️ 한계 (서비스 내 안내 문구 포함):</strong><br>
+      "맛살"같은 복합 가공식품은 AI가 오분류할 수 있어요. 그래서 서비스에 "본 알레르기 필터링은 참고용이며, 심각한 알레르기 보유자는 반드시 성분을 직접 확인하시기 바랍니다."라는 안내 문구를 달았습니다.
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════ 탭 4: 교수 피드백 반영 ══════════ -->
+<div id="tab-feedback" class="content">
+
+  <div class="sec">
+    <div class="sec-title">중간발표 피드백 → 기말 개선 내용</div>
+
+    <div class="feedback">
+      <div class="feedback-label">피드백 ①</div>
+      <div class="feedback-text">"단순히 유형을 선택하는 방식은 개인 맞춤형이라고 보기 어렵다. 사용자의 입력값이 추천 결과에 어떻게 반영되는지 명확해야 한다."</div>
+    </div>
+    <div class="response">
+      <div class="response-label">개선 결과</div>
+      <div class="response-text">자취생/다이어터 유형 선택 방식 폐지. 가격·단백질·칼로리·나트륨·조리시간 5개 기준의 가중치를 슬라이더로 직접 설정하는 방식으로 전환. 추천 점수 공식(BaseScore = Σwᵢ·sᵢ)을 명시하여 "왜 이 레시피가 추천됐는지" 설명 가능.</div>
+    </div>
+
+    <div class="feedback">
+      <div class="feedback-label">피드백 ②</div>
+      <div class="feedback-text">"가격 계산은 어떻게 했는가? 조리시간은 어디서 가져왔는가? 데이터의 출처와 산정 방식이 명확해야 한다."</div>
+    </div>
+    <div class="response">
+      <div class="response-label">개선 결과</div>
+      <div class="response-text">가격: KAMIS API(공식 시세) → 네이버 쇼핑 API(lprice ÷ 용량 역산) → STANDARD_AVERAGE_DB 3단계 파이프라인으로 출처 명확화. 조리시간: 식약처 API는 별도 필드 없음 → 텍스트에서 시간 표현 추출 + 조리방법·단계 수 기반 규칙 추정. "예상 조리시간"으로 명시.</div>
+    </div>
+
+    <div class="feedback">
+      <div class="feedback-label">피드백 ③</div>
+      <div class="feedback-text">"80%씩 점수를 깎으면 너무 과하다. 반복 추천 방지 방식을 재검토하라."</div>
+    </div>
+    <div class="response">
+      <div class="response-label">개선 결과</div>
+      <div class="response-text">apply_penalty(점수 직접 차감) 방식 폐지. Carbonell & Goldstein(1998) MMR 알고리즘 도입. 점수를 깎지 않고 이미 선택된 레시피와 유사한 항목의 순서만 뒤로 미룸. λ=0.7 설정(관련성 70%, 다양성 30%).</div>
+    </div>
+
+    <div class="feedback">
+      <div class="feedback-label">피드백 ④</div>
+      <div class="feedback-text">"정확한 금액 수치는 데이터 신뢰성 문제로 공격받을 수 있다. 표현 방식을 재검토하라."</div>
+    </div>
+    <div class="response">
+      <div class="response-label">개선 결과</div>
+      <div class="response-text">재료비를 낮음(~3,000원) / 보통(3,000~10,000원) / 높음(10,000원+) 3단계 등급으로 표시 변경. 구체적인 금액은 사용자가 클릭할 때만 참고용으로 표시. 추천 점수 수치도 내부에서만 사용, 화면 미노출.</div>
+    </div>
+
+    <div class="feedback">
+      <div class="feedback-label">피드백 ⑤</div>
+      <div class="feedback-text">"슬라이더 방향이 직관적이지 않다. 낮음/높음 라벨이 있어야 한다."</div>
+    </div>
+    <div class="response">
+      <div class="response-label">개선 결과</div>
+      <div class="response-text">슬라이더 양 끝에 "낮음 ─●─ 높음" 라벨 추가. 추가로 회원가입 1회 설정 → 이후 자동 적용되는 프로필 저장 기능 추가("매번 입력하지 마라" 피드백 반영).</div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">중간 vs 최종 — 한눈에 비교</div>
+    <table>
+      <tr><th>항목</th><th>중간 시스템</th><th>최종 시스템</th></tr>
+      <tr><td>개인화 구조</td><td>유형 선택(자취생/다이어터)</td><td>5축 가중치 슬라이더 직접 설정</td></tr>
+      <tr><td>가중치 지속성</td><td>매 검색 시 재설정</td><td>1회 프로필 저장, 자동 적용</td></tr>
+      <tr><td>다양성 확보</td><td>점수 최대 80% 직접 차감</td><td>MMR 순서 조정 (λ=0.7)</td></tr>
+      <tr><td>나트륨 기준</td><td>없음 (4개 축)</td><td>5번째 축 추가, 저염 프리셋 제공</td></tr>
+      <tr><td>가격 산정</td><td>수동 입력</td><td>KAMIS+네이버쇼핑 자동 계산</td></tr>
+      <tr><td>가격 표시</td><td>정확한 금액 노출</td><td>낮음/보통/높음 등급, 클릭 시 확인</td></tr>
+      <tr><td>알레르기 기피</td><td>없음</td><td>식약처 22종 기준 체크박스 필터링</td></tr>
+      <tr><td>응답 속도</td><td>매 요청 API 호출 (수 분)</td><td>배치 캐시 선처리 (1~3초)</td></tr>
+    </table>
+  </div>
+
+</div>
+
+<script>
+function tab(id, btn) {
+  document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+  window.scrollTo({ top: document.getElementById('nav').offsetTop - 1, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
